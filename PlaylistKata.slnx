@@ -1,4 +1,0 @@
-<Solution>
-  <Project Path="Playlist.Domain/Playlist.Domain.csproj" />
-  <Project Path="PlaylistKata.App/PlaylistKata.App.csproj" />
-</Solution>
