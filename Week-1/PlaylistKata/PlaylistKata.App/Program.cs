@@ -1,4 +1,5 @@
 ﻿using Playlist.Domain;
+using Serilog;
 
 namespace PlaylistKata.App;
 
@@ -8,6 +9,14 @@ public class Program
 
     public static void Main()
     {
+        //Serilog configured once 
+        Log.Logger = new LoggerConfiguration()
+           .MinimumLevel.Information()
+           .WriteTo.Console()
+           .WriteTo.File("logs/logger.txt")
+           .CreateLogger();
+
+
         var running = true;
         while (running)
         {
@@ -41,6 +50,10 @@ public class Program
                     break;
             }
         }
+        
+
+        //Serilog being closed
+        Log.CloseAndFlush();
     }
 
     private static void Menu()
