@@ -1,4 +1,5 @@
 ﻿using Playlist.Domain;
+using Serilog;
 
 namespace PlaylistKata.App;
 
@@ -8,6 +9,14 @@ public class Program
 
     public static void Main()
     {
+        //Serilog configured once 
+        Log.Logger = new LoggerConfiguration()
+           .MinimumLevel.Information()
+           .WriteTo.Console()
+           .WriteTo.File("logs/logger.txt")
+           .CreateLogger();
+
+
         var running = true;
         while (running)
         {
@@ -41,6 +50,10 @@ public class Program
                     break;
             }
         }
+        
+
+        //Serilog being closed
+        Log.CloseAndFlush();
     }
 
     private static void Menu()
@@ -155,8 +168,8 @@ private static float CalculateTotalTime(List<PlaylistItem> items)
         return new List<PlaylistItem> {
             new AudioBook("Book1", "Author1", 1.1f, 0, "Reader1"),
             new AudioBook("Book2", "Author2", 2.2f, 0, "Reader2"),
-            new Song("Song1", "Artist1", 3.3f, 0, "Rock"),
-            new Song("Song2", "Artist2", 4.4f, 0, "Pop"),
+            new Song("Song1", "Artist1", 3.3f, 0, "Rock", "No"),
+            new Song("Song2", "Artist2", 4.4f, 0, "Pop", "Yes"),
             new Podcast("Pod1", "Host1", 5.5f, 0, "Guest1"),
             new Podcast("Pod2", "Host2", 6.6f, 0, "Guest2")
         };
