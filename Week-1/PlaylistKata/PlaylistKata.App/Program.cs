@@ -19,7 +19,7 @@ public class Program
            .CreateLogger();
 
 
-        var running = true;
+        bool running = true;
         while (running)
         {
             Menu();
@@ -44,7 +44,7 @@ public class Program
                     TimeTrack();
                     break;
                 case 5:
-                    Console.WriteLine("Search song on API!");
+                    Console.WriteLine("Search song on API and Add!");
                     await AsyncSearchFromApi();
                     break;
                 case 6:
@@ -70,7 +70,7 @@ public class Program
         Console.WriteLine("\n 2.Play");
         Console.WriteLine("\n 3.Show media library");
         Console.WriteLine("\n 4.Total playlist time");
-        Console.WriteLine("\n 5. Search from API");
+        Console.WriteLine("\n 5. Search from API and Add");
         Console.WriteLine("\n 6.Exit\n");
     }
 
@@ -107,19 +107,25 @@ public class Program
 
                 Console.Write("Type the track album: ");
                 string album = Console.ReadLine();
-                _mediaLibrary.Add(new Song(trackName, author, duration, 0, genre, album));
+                Song newSong = new Song(trackName, author, duration, 0, genre, album); // adding song to a library before the confirmation
+                _mediaLibrary.Add(newSong);
+                ConfirmSelection(newSong); // confirm if the song added was correct, that's for making use of the Undo method
                 break;
             case 2:
                 Console.WriteLine("Podcast!");
                 Console.Write("Type the Special Guest: ");
                 string specialGuest = Console.ReadLine();
-                _mediaLibrary.Add(new Podcast(trackName, author, duration, 0, specialGuest));
+                Podcast newPodcast = new Podcast(trackName, author, duration, 0, specialGuest);
+                _mediaLibrary.Add(newPodcast);
+                ConfirmSelection(newPodcast);
                 break;
             case 3:
                 Console.WriteLine("AudioBook!");
                 Console.Write("Type the Name of the Voice Actor: ");
                 string reader = Console.ReadLine();
-                _mediaLibrary.Add(new AudioBook(trackName, author, duration, 0, reader));
+                AudioBook newAudioBook = new AudioBook(trackName, author, duration, 0, reader);
+                _mediaLibrary.Add(newAudioBook);
+                ConfirmSelection(newAudioBook);
                 break;
             default:
                 Console.WriteLine("Invalid choice");
@@ -172,6 +178,18 @@ public class Program
         }
         return trackTime;
     }
+
+    public static void ConfirmSelection(PlaylistItem item)
+    {
+        Console.WriteLine("Is your selection correct? ");
+        Console.Write("Type 'y' to confirm: ");
+        string answer = Console.ReadLine();
+
+        if(answer.ToLower() != "y")
+        {
+            _mediaLibrary.Undo();
+        }
+    }
     
     public static void GetSeedItems()
     {
@@ -203,5 +221,6 @@ public class Program
 
         _mediaLibrary.Add(result);
         Console.WriteLine($"Added new Song: {result.Describe()}");
+        ConfirmSelection(result); // confirm typing 'y' in the keyboard
     }
 }
