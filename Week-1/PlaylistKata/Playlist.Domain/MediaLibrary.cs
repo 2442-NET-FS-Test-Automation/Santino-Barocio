@@ -23,12 +23,13 @@ public class MediaLibrary
     public void Undo()
     {
 
-        if(undoCount == 0)
+        if(_undoSong.Count == 0)
         {
             Console.WriteLine("Nothing to undo!\n");
             return;
         }
 
+        Console.WriteLine("Undo selection!");
         var (action, item) = _undoSong.Pop(); // removes and returns the object located at the top of a <Stack>
         if (action == "Add") _library.Remove(item); // undo: if the element was added before and there was an undo, remove it from the list
         else if(action == "Remove") _library.Add(item); // undo: if the element was removed and you needed to undo, then it gets added again
@@ -36,7 +37,5 @@ public class MediaLibrary
     
     public List<PlaylistItem> GetItems() => _library;
     
-    public int undoCount => _undoSong.Count;
-    
-    public bool hasUndoHistory => _undoSong.Count > 0;
+    // public bool hasUndoHistory => _undoSong.Count > 0;
 }
