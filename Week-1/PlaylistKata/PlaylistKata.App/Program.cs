@@ -5,10 +5,11 @@ namespace PlaylistKata.App;
 
 public class Program
 {
-    private static List<PlaylistItem> PlaylistItems = GetSeedItems();
+    private static MediaLibrary _mediaLibrary = new MediaLibrary();
 
     public static void Main()
     {
+        GetSeedItems();
         //Serilog configured once 
         Log.Logger = new LoggerConfiguration()
            .MinimumLevel.Information()
@@ -62,7 +63,7 @@ public class Program
         Console.WriteLine("Select an option");
         Console.WriteLine("\n 1.Add track");
         Console.WriteLine("\n 2.Play");
-        Console.WriteLine("\n 3.List");
+        Console.WriteLine("\n 3.Show media library");
         Console.WriteLine("\n 4.Total playlist time");
         Console.WriteLine("\n 5.Exit\n");
     }
@@ -97,19 +98,22 @@ public class Program
                 Console.WriteLine("Song!");
                 Console.Write("Type the track Genre: ");
                 string genre = Console.ReadLine();
-                PlaylistItems.Add(new Song(trackName, author, duration, 0, genre));
+
+                Console.WriteLine("Type the track album: ");
+                string album = Console.ReadLine();
+                _mediaLibrary.Add(new Song(trackName, author, duration, 0, genre, album));
                 break;
             case 2:
                 Console.WriteLine("Podcast!");
                 Console.Write("Type the Special Guest: ");
                 string specialGuest = Console.ReadLine();
-                PlaylistItems.Add(new Podcast(trackName, author, duration, 0, specialGuest));
+                _mediaLibrary.Add(new Podcast(trackName, author, duration, 0, specialGuest));
                 break;
             case 3:
                 Console.WriteLine("AudioBook!");
                 Console.Write("Type the Name of the Voice Actor: ");
                 string reader = Console.ReadLine();
-                PlaylistItems.Add(new AudioBook(trackName, author, duration, 0, reader));
+                _mediaLibrary.Add(new AudioBook(trackName, author, duration, 0, reader));
                 break;
             default:
                 Console.WriteLine("Invalid choice");
@@ -122,7 +126,7 @@ public class Program
         Console.Write("Type the track name to play: ");
         string trackName = Console.ReadLine();
 
-        foreach (PlaylistItem track in PlaylistItems)
+        foreach (PlaylistItem track in _mediaLibrary.GetItems())
         {
             if (track.Title == trackName)
             {
@@ -137,7 +141,7 @@ public class Program
 
     private static void ListTrack()
     {
-        foreach (PlaylistItem track in PlaylistItems)
+        foreach (PlaylistItem track in _mediaLibrary.GetItems())
         {
             Console.WriteLine(track.Describe());
         }
@@ -145,7 +149,7 @@ public class Program
 
     private static void TimeTrack()
     {
-        float total = CalculateTotalTime(PlaylistItems);
+        float total = CalculateTotalTime(_mediaLibrary.GetItems());
         Console.WriteLine($"Total playlist time: {total}");
     }
 
@@ -163,15 +167,13 @@ private static float CalculateTotalTime(List<PlaylistItem> items)
         return trackTime;
     }
     
-    public static List<PlaylistItem> GetSeedItems()
+    public static void GetSeedItems()
     {
-        return new List<PlaylistItem> {
-            new AudioBook("Book1", "Author1", 1.1f, 0, "Reader1"),
-            new AudioBook("Book2", "Author2", 2.2f, 0, "Reader2"),
-            new Song("Song1", "Artist1", 3.3f, 0, "Rock", "No"),
-            new Song("Song2", "Artist2", 4.4f, 0, "Pop", "Yes"),
-            new Podcast("Pod1", "Host1", 5.5f, 0, "Guest1"),
-            new Podcast("Pod2", "Host2", 6.6f, 0, "Guest2")
-        };
+        _mediaLibrary.Add(new AudioBook("Book1", "Author1", 1.1f, 0, "Reader1"));
+        _mediaLibrary.Add(new AudioBook("Book2", "Author2", 2.2f, 0, "Reader2"));
+        _mediaLibrary.Add(new Song("Song1", "Artist1", 3.3f, 0, "Rock", "No"));
+        _mediaLibrary.Add(new Song("Song2", "Artist2", 4.4f, 0, "Pop", "Yes"));
+        _mediaLibrary.Add(new Podcast("Pod1", "Host1", 5.5f, 0, "Guest1"));
+        _mediaLibrary.Add(new Podcast("Pod2", "Host2", 6.6f, 0, "Guest2"));
     }
 }
