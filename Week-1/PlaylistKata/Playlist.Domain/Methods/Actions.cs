@@ -7,6 +7,7 @@ public class Actions : IActions
     //The method below will interact with the playlist
     public void AddToPlaylist()
     {
+        
         throw new NotImplementedException();
     }
     

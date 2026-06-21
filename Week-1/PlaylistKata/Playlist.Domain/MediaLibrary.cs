@@ -36,8 +36,6 @@ public class MediaLibrary
     
     public List<PlaylistItem> GetItems() => _library;
     
-    public PlaylistItem? GetItem(int id) => _library.Find(x => x.Id == id);
-    
     public int undoCount => _undoSong.Count;
     
     public bool hasUndoHistory => _undoSong.Count > 0;
