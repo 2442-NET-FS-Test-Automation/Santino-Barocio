@@ -79,7 +79,7 @@ public class DataService : IDataService
             timesplayed = timesplayednewInt;
             
         // get genre
-        string genre = foundTracks.GetProperty("strGenre").GetString() ?? "No album";
+        string genre = foundTracks.GetProperty("strGenre").GetString() ?? "No Genre";
 
         // get album
         string album = foundTracks.GetProperty("strAlbum").GetString() ?? "No album";

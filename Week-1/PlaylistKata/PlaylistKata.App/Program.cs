@@ -1,4 +1,5 @@
 ﻿using Playlist.Domain;
+using Playlist.Domain.DataServices;
 using Serilog;
 
 namespace PlaylistKata.App;
@@ -7,7 +8,7 @@ public class Program
 {
     private static MediaLibrary _mediaLibrary = new MediaLibrary();
 
-    public static void Main()
+    public static async Task Main()
     {
         GetSeedItems();
         //Serilog configured once 
@@ -43,6 +44,10 @@ public class Program
                     TimeTrack();
                     break;
                 case 5:
+                    Console.WriteLine("Search song on API!");
+                    await AsyncSearchFromApi();
+                    break;
+                case 6:
                     Console.WriteLine("Bye bye!");
                     running = false;
                     break;
@@ -65,7 +70,8 @@ public class Program
         Console.WriteLine("\n 2.Play");
         Console.WriteLine("\n 3.Show media library");
         Console.WriteLine("\n 4.Total playlist time");
-        Console.WriteLine("\n 5.Exit\n");
+        Console.WriteLine("\n 5. Search from API");
+        Console.WriteLine("\n 6.Exit\n");
     }
 
     private static void AddMenu()
@@ -99,7 +105,7 @@ public class Program
                 Console.Write("Type the track Genre: ");
                 string genre = Console.ReadLine();
 
-                Console.WriteLine("Type the track album: ");
+                Console.Write("Type the track album: ");
                 string album = Console.ReadLine();
                 _mediaLibrary.Add(new Song(trackName, author, duration, 0, genre, album));
                 break;
@@ -154,7 +160,7 @@ public class Program
     }
 
     
-private static float CalculateTotalTime(List<PlaylistItem> items)
+    private static float CalculateTotalTime(List<PlaylistItem> items)
     {
         float trackTime = 0;
         foreach (PlaylistItem track in items)
@@ -175,5 +181,27 @@ private static float CalculateTotalTime(List<PlaylistItem> items)
         _mediaLibrary.Add(new Song("Song2", "Artist2", 4.4f, 0, "Pop", "Yes"));
         _mediaLibrary.Add(new Podcast("Pod1", "Host1", 5.5f, 0, "Guest1"));
         _mediaLibrary.Add(new Podcast("Pod2", "Host2", 6.6f, 0, "Guest2"));
+    }
+
+    // Search, type the data below and get api information about the song
+    public static async Task AsyncSearchFromApi()
+    {
+        Console.Write("Type the Artist: ");
+        string? artist = Console.ReadLine() ?? "";
+
+        Console.Write("Type the Song: ");
+        string? song = Console.ReadLine() ?? "";
+
+        var DataService = new DataService();
+        Song? result = await DataService.GetSong(artist, song);
+
+        if(result == null)
+        {
+            Console.WriteLine("Song could not be found!");
+            return;
+        }
+
+        _mediaLibrary.Add(result);
+        Console.WriteLine($"Added new Song: {result.Describe()}");
     }
 }
