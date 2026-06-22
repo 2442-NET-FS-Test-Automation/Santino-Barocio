@@ -28,6 +28,4 @@ public abstract class PlaylistItem
     {
         return $"{Id}: {Title}";
     }
-
-
 }
