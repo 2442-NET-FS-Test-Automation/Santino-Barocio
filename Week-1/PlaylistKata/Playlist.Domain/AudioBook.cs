@@ -1,6 +1,7 @@
 namespace Playlist.Domain;
 
-public class AudioBook : PlaylistItem
+//agregado sealed
+public sealed class AudioBook : PlaylistItem
 {
     public string  VoiceReader{get;}
 

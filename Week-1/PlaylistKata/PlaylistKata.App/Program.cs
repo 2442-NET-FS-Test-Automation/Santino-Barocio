@@ -1,12 +1,17 @@
 ﻿using Playlist.Domain;
 using Playlist.Domain.DataServices;
+using Playlist.Domain.Utils;
 using Serilog;
+
 
 namespace PlaylistKata.App;
 
 public class Program
 {
     private static MediaLibrary _mediaLibrary = new MediaLibrary();
+
+    private static bool _isPlaying = false;
+    private static PlaylistItem? _currentTrack = null;
 
     public static async Task Main()
     {
@@ -48,6 +53,21 @@ public class Program
                     await AsyncSearchFromApi();
                     break;
                 case 6:
+                    Console.WriteLine("Placing a track in the Display Case!");
+                    PlaceInGrid();
+                    break;
+                case 7:
+                    _mediaLibrary.ShowDisplayCase();
+                    break;
+                case 8:
+                    Console.WriteLine("Custom Search!");
+                    SearchByDuration();
+                    break;
+                case 9:
+                    Console.WriteLine("Lazy loading tracks!");
+                    ListTracksLazily();
+                    break;
+                case 10:
                     Console.WriteLine("Bye bye!");
                     running = false;
                     break;
@@ -64,14 +84,24 @@ public class Program
 
     private static void Menu()
     {
-        Console.WriteLine("=== Menu ===");
+
+        if (_isPlaying && _currentTrack != null)
+            {
+                Console.WriteLine($"[ ▶ NOW PLAYING: {_currentTrack.Title} ]");
+            }
+
+        Console.WriteLine("\n=== Menu ===");
         Console.WriteLine("Select an option");
-        Console.WriteLine("\n 1.Add track");
-        Console.WriteLine("\n 2.Play");
-        Console.WriteLine("\n 3.Show media library");
-        Console.WriteLine("\n 4.Total playlist time");
-        Console.WriteLine("\n 5. Search from API and Add");
-        Console.WriteLine("\n 6.Exit\n");
+        Console.WriteLine(" 1. Add track");
+        Console.WriteLine(" 2. Play");
+        Console.WriteLine(" 3. Show media library");
+        Console.WriteLine(" 4. Total playlist time");
+        Console.WriteLine(" 5. Search from API and Add");
+        Console.WriteLine(" 6. Place track in Display Case");
+        Console.WriteLine(" 7. View physical Display Case");
+        Console.WriteLine(" 8. Search tracks by minimum duration");
+        Console.WriteLine(" 9. Lazy load tracks (step-by-step)");
+        Console.WriteLine(" 10. Exit\n");
     }
 
     private static void AddMenu()
@@ -91,8 +121,14 @@ public class Program
         Console.Write("Type the Author of the track: ");
         string author = Console.ReadLine();
 
-        Console.Write("Type the track Duration: ");
-        float.TryParse(Console.ReadLine(), out float duration);
+        Console.Write("Type the track Duration (Format MM:SS, e.g., 03:45): ");
+        string? durationInput = Console.ReadLine();
+
+        if (!InputValidator.TryValidateDuration(durationInput, out float duration))
+        {
+            Console.WriteLine("Error: Malformed duration format. Track was not saved.\n");
+            return; // Falla ruidosamente y aborta la creación
+        }
 
         AddMenu();
         Console.Write(": ");
@@ -106,7 +142,7 @@ public class Program
                 string genre = Console.ReadLine();
 
                 Console.Write("Type the track album: ");
-                string album = Console.ReadLine();
+                string? album = Console.ReadLine();
                 Song newSong = new Song(trackName, author, duration, 0, genre, album); // adding song to a library before the confirmation
                 _mediaLibrary.Add(newSong);
                 ConfirmSelection(newSong); // confirm if the song added was correct, that's for making use of the Undo method
@@ -138,12 +174,23 @@ public class Program
         Console.Write("Type the track name to play: ");
         string trackName = Console.ReadLine();
 
+        if (string.IsNullOrEmpty(trackName))
+        {
+            Console.WriteLine("You must type a valid track name.");
+            return;
+        }
+
         foreach (PlaylistItem track in _mediaLibrary.GetItems())
         {
-            if (track.Title == trackName)
+            if (track.Title != null && track.Title.Equals(trackName, StringComparison.OrdinalIgnoreCase))
             {
-                track.Play();
-                Console.WriteLine($"Now playing: {track.Title} (Played {track.TimesPlayed} times)");
+                if (_isPlaying)
+                {
+                    Console.WriteLine("Stopping current track...");
+                }
+
+                StartBackgroundPlayback(track);
+                Console.WriteLine($"\nStarted playing: {track.Title} in the background.");
                 return;
             }
         }
@@ -153,10 +200,12 @@ public class Program
 
     private static void ListTrack()
     {
+        Console.WriteLine($"\n--- Library (Unique Artists/Authors: {_mediaLibrary.Authors.Count}) ---");
         foreach (PlaylistItem track in _mediaLibrary.GetItems())
         {
             Console.WriteLine(track.Describe());
         }
+        Console.WriteLine("----------------------------------\n");
     }
 
     private static void TimeTrack()
@@ -223,4 +272,99 @@ public class Program
         Console.WriteLine($"Added new Song: {result.Describe()}");
         ConfirmSelection(result); // confirm typing 'y' in the keyboard
     }
+
+    private static void PlaceInGrid()
+    {
+        Console.Write("Type the track ID to place: ");
+        if (!int.TryParse(Console.ReadLine(), out int id))
+        {
+            Console.WriteLine("Invalid ID format.");
+            return;
+        }
+
+        try
+        {
+            PlaylistItem track = _mediaLibrary.GetItemById(id);
+            
+            Console.Write("Enter Row (0 to 2): ");
+            int.TryParse(Console.ReadLine(), out int row);
+            
+            Console.Write("Enter Column (0 to 2): ");
+            int.TryParse(Console.ReadLine(), out int col);
+            
+            _mediaLibrary.PlaceInDisplayCase(track, row, col);
+            Console.WriteLine($"Track '{track.Title}' placed successfully at [{row},{col}]!");
+        }
+        catch (PlaylistItemNotFoundExc ex)
+        {
+            Console.WriteLine($"Error: {ex.Message}");
+        }
+        finally
+        {
+            Console.WriteLine("--- End of display placement attempt ---\n");
+        }
+    }
+
+    private static void SearchByDuration()
+    {
+        Console.Write("Find tracks longer than (minutes, e.g., 3.5): ");
+        if (float.TryParse(Console.ReadLine(), out float minDuration))
+        {
+            List<PlaylistItem> results = _mediaLibrary.Find(item => item.Duration.HasValue && item.Duration.Value > minDuration);
+            
+            Console.WriteLine($"\n--- Tracks longer than {minDuration} mins ---");
+            if (results.Count == 0)
+            {
+                Console.WriteLine("No tracks found.");
+            }
+            else
+            {
+                foreach (var item in results)
+                {
+                    Console.WriteLine(item.Describe());
+                }
+            }
+            Console.WriteLine("----------------------------------\n");
+        }
+        else
+        {
+            Console.WriteLine("Invalid duration format.");
+        }
+    }
+
+    private static void ListTracksLazily()
+    {
+        Console.WriteLine("\n--- Lazy Loading Library ---");
+        
+        foreach (PlaylistItem track in _mediaLibrary.GetItemsLazy())
+        {
+            Console.WriteLine(track.Describe());
+            Console.Write("Press Enter to fetch the next track (or type 'q' to stop): ");
+            
+            string? input = Console.ReadLine();
+            if (input?.ToLower() == "q")
+            {
+                break;
+            }
+        }
+        
+        Console.WriteLine("--- End of Lazy Load ---\n");
+    }
+
+    private static void StartBackgroundPlayback(PlaylistItem track)
+        {
+            _isPlaying = true;
+            _currentTrack = track;
+            track.Play(); 
+            Task.Run(async () =>
+            {
+                int durationMs = track.Duration.HasValue ? (int)(track.Duration.Value * 1000) : 5000;
+                
+                await Task.Delay(durationMs); // Espera sin bloquear el hilo
+                
+                _isPlaying = false;
+                _currentTrack = null;
+            });
+        }
+
 }
