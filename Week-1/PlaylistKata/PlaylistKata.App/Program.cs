@@ -1,14 +1,25 @@
 ﻿using Playlist.Domain;
+using Playlist.Domain.DataServices;
+using Serilog;
 
 namespace PlaylistKata.App;
 
 public class Program
 {
-    private static List<PlaylistItem> PlaylistItems = GetSeedItems();
+    private static MediaLibrary _mediaLibrary = new MediaLibrary();
 
-    public static void Main()
+    public static async Task Main()
     {
-        var running = true;
+        GetSeedItems();
+        //Serilog configured once 
+        Log.Logger = new LoggerConfiguration()
+           .MinimumLevel.Information()
+           .WriteTo.Console()
+           .WriteTo.File("logs/logger.txt")
+           .CreateLogger();
+
+
+        bool running = true;
         while (running)
         {
             Menu();
@@ -33,6 +44,10 @@ public class Program
                     TimeTrack();
                     break;
                 case 5:
+                    Console.WriteLine("Search song on API and Add!");
+                    await AsyncSearchFromApi();
+                    break;
+                case 6:
                     Console.WriteLine("Bye bye!");
                     running = false;
                     break;
@@ -41,6 +56,10 @@ public class Program
                     break;
             }
         }
+        
+
+        //Serilog being closed
+        Log.CloseAndFlush();
     }
 
     private static void Menu()
@@ -49,9 +68,10 @@ public class Program
         Console.WriteLine("Select an option");
         Console.WriteLine("\n 1.Add track");
         Console.WriteLine("\n 2.Play");
-        Console.WriteLine("\n 3.List");
+        Console.WriteLine("\n 3.Show media library");
         Console.WriteLine("\n 4.Total playlist time");
-        Console.WriteLine("\n 5.Exit\n");
+        Console.WriteLine("\n 5. Search from API and Add");
+        Console.WriteLine("\n 6.Exit\n");
     }
 
     private static void AddMenu()
@@ -84,19 +104,28 @@ public class Program
                 Console.WriteLine("Song!");
                 Console.Write("Type the track Genre: ");
                 string genre = Console.ReadLine();
-                PlaylistItems.Add(new Song(trackName, author, duration, 0, genre));
+
+                Console.Write("Type the track album: ");
+                string album = Console.ReadLine();
+                Song newSong = new Song(trackName, author, duration, 0, genre, album); // adding song to a library before the confirmation
+                _mediaLibrary.Add(newSong);
+                ConfirmSelection(newSong); // confirm if the song added was correct, that's for making use of the Undo method
                 break;
             case 2:
                 Console.WriteLine("Podcast!");
                 Console.Write("Type the Special Guest: ");
                 string specialGuest = Console.ReadLine();
-                PlaylistItems.Add(new Podcast(trackName, author, duration, 0, specialGuest));
+                Podcast newPodcast = new Podcast(trackName, author, duration, 0, specialGuest);
+                _mediaLibrary.Add(newPodcast);
+                ConfirmSelection(newPodcast);
                 break;
             case 3:
                 Console.WriteLine("AudioBook!");
                 Console.Write("Type the Name of the Voice Actor: ");
                 string reader = Console.ReadLine();
-                PlaylistItems.Add(new AudioBook(trackName, author, duration, 0, reader));
+                AudioBook newAudioBook = new AudioBook(trackName, author, duration, 0, reader);
+                _mediaLibrary.Add(newAudioBook);
+                ConfirmSelection(newAudioBook);
                 break;
             default:
                 Console.WriteLine("Invalid choice");
@@ -109,7 +138,7 @@ public class Program
         Console.Write("Type the track name to play: ");
         string trackName = Console.ReadLine();
 
-        foreach (PlaylistItem track in PlaylistItems)
+        foreach (PlaylistItem track in _mediaLibrary.GetItems())
         {
             if (track.Title == trackName)
             {
@@ -124,7 +153,7 @@ public class Program
 
     private static void ListTrack()
     {
-        foreach (PlaylistItem track in PlaylistItems)
+        foreach (PlaylistItem track in _mediaLibrary.GetItems())
         {
             Console.WriteLine(track.Describe());
         }
@@ -132,12 +161,12 @@ public class Program
 
     private static void TimeTrack()
     {
-        float total = CalculateTotalTime(PlaylistItems);
+        float total = CalculateTotalTime(_mediaLibrary.GetItems());
         Console.WriteLine($"Total playlist time: {total}");
     }
 
     
-private static float CalculateTotalTime(List<PlaylistItem> items)
+    private static float CalculateTotalTime(List<PlaylistItem> items)
     {
         float trackTime = 0;
         foreach (PlaylistItem track in items)
@@ -149,16 +178,49 @@ private static float CalculateTotalTime(List<PlaylistItem> items)
         }
         return trackTime;
     }
-    
-    public static List<PlaylistItem> GetSeedItems()
+
+    public static void ConfirmSelection(PlaylistItem item)
     {
-        return new List<PlaylistItem> {
-            new AudioBook("Book1", "Author1", 1.1f, 0, "Reader1"),
-            new AudioBook("Book2", "Author2", 2.2f, 0, "Reader2"),
-            new Song("Song1", "Artist1", 3.3f, 0, "Rock", "No"),
-            new Song("Song2", "Artist2", 4.4f, 0, "Pop", "Yes"),
-            new Podcast("Pod1", "Host1", 5.5f, 0, "Guest1"),
-            new Podcast("Pod2", "Host2", 6.6f, 0, "Guest2")
-        };
+        Console.WriteLine("Is your selection correct? ");
+        Console.Write("Type 'y' to confirm: ");
+        string answer = Console.ReadLine();
+
+        if(answer.ToLower() != "y")
+        {
+            _mediaLibrary.Undo();
+        }
+    }
+    
+    public static void GetSeedItems()
+    {
+        _mediaLibrary.Add(new AudioBook("Book1", "Author1", 1.1f, 0, "Reader1"));
+        _mediaLibrary.Add(new AudioBook("Book2", "Author2", 2.2f, 0, "Reader2"));
+        _mediaLibrary.Add(new Song("Song1", "Artist1", 3.3f, 0, "Rock", "No"));
+        _mediaLibrary.Add(new Song("Song2", "Artist2", 4.4f, 0, "Pop", "Yes"));
+        _mediaLibrary.Add(new Podcast("Pod1", "Host1", 5.5f, 0, "Guest1"));
+        _mediaLibrary.Add(new Podcast("Pod2", "Host2", 6.6f, 0, "Guest2"));
+    }
+
+    // Search, type the data below and get api information about the song
+    public static async Task AsyncSearchFromApi()
+    {
+        Console.Write("Type the Artist: ");
+        string? artist = Console.ReadLine() ?? "";
+
+        Console.Write("Type the Song: ");
+        string? song = Console.ReadLine() ?? "";
+
+        var DataService = new DataService();
+        Song? result = await DataService.GetSong(artist, song);
+
+        if(result == null)
+        {
+            Console.WriteLine("Song could not be found!");
+            return;
+        }
+
+        _mediaLibrary.Add(result);
+        Console.WriteLine($"Added new Song: {result.Describe()}");
+        ConfirmSelection(result); // confirm typing 'y' in the keyboard
     }
 }

@@ -32,7 +32,8 @@ public class DataService : IDataService
                     int.TryParse(tracks[0]?["intDuration"]?.ToString(), out int durationInMs);
                     float durationInSeconds = durationInMs / 1000.0f;
                     JsonNode? track = tracks[0];
-                    return new Song(
+                    return (Song?) PlaylistItemFactory.Create(
+                        ItemKind.Song,
                         track?["strTrack"]?.ToString() ?? "Unknown",
                         track?["strArtist"]?.ToString() ?? "Unknown",
                         durationInSeconds,
@@ -42,7 +43,7 @@ public class DataService : IDataService
                 }
                 else
                 {
-                    Log.Warning("No matching song found for Artist: {Artist}, Song: {Song}",
+                    Log.Warning("No matching song found for Artist: {Artist}, Song: {Song}", artist, song);
                     return null;
                 }
             }
