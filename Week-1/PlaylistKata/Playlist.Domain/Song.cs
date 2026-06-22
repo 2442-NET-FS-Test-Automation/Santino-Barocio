@@ -1,6 +1,7 @@
 namespace Playlist.Domain;
 
-public class Song: PlaylistItem
+//agregado sealed
+public sealed class Song: PlaylistItem
 {
     public string Genre {get; private set;}
     public string Album {get; private set;}

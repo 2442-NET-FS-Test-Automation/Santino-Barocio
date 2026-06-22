@@ -1,6 +1,7 @@
 namespace Playlist.Domain;
 
-public class Podcast : PlaylistItem
+//agregado sealed
+public sealed class Podcast : PlaylistItem
 {
     public string SpecialGuest {get;}
 
