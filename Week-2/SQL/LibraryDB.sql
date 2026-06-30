@@ -666,3 +666,176 @@ JOIN dbo.Book b ON b.BookId = l.BookId
 JOIN dbo.Category c ON c.CategoryId = b.CategoryId
 WHERE l.ReturnDate IS NULL
 ORDER BY DaysOverdue DESC;
+
+-- Transactions - All of this runs or NONE of it succeeds
+-- At its most basic a Transaction is just BEGIN and COMMIT
+-- BUT we want to account for things going wrong gracefull - even if
+-- an error or exception WONT bring the database down
+
+-- SQL despite not beign a programming language - has TRY and CATCH
+
+-- SQL Server is an application. It, like any other applications, can have runtime errors
+-- This flag below, causes SQL Server to abort any transaction when an error surfaces
+-- Put it right before your try catch - this is SQL Server Specific
+
+SET XACT_ABORT ON; -- SQL Server specific
+
+BEGIN TRY -- A little verbose but it works
+    -- Starts here
+    BEGIN TRANSACTION -- we put our transaction here
+    -- The logic of our transaction goes here below
+
+    -- Member 2 checks out book 1
+    INSERT INTO dbo.Loan(BookId, MemberId, DueDate)
+    VALUES (1,2, DATEADD(DAY, 14, GETDATE())) -- Using Dateadd to generate a due date
+
+    -- So we did an insert - now Let's do an update
+    -- Book 1 Available copies decremented
+    UPDATE dbo.Book SET AvailableCopies = AvailableCopies - 1 WHERE BookId = 1;
+    
+    -- Ends Here
+    COMMIT TRANSACTION
+    PRINT 'Checkout COMMITED'
+END TRY
+BEGIN CATCH
+    -- If something goes wrong we can detect it and roll back
+    -- If we make it to the CATCH, something went wrong. Either a runtime error
+    -- OR some sort of constraint or data integrity violation, like trying to create orphan records
+    -- The transaction remains open on this connection - we check to see if by the time we hit the catch
+    -- any transactions ARE open. If there are, we want to abort them - roll them back
+    IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+    PRINT 'Checkout ROLLED BACK: ' + ERROR_MESSAGE();
+
+END CATCH
+
+    -- Every transactions ends in either a COMMIT or a ROLLBACK - you must provice logic for both
+    -- If you have a bunch of branching paths keep that in mind.
+
+    -- Isolation levels - largely managed by the RDBMS that runs our Database
+    -- but we have some options- We can, if we want to,
+    -- set the isolation leve
+
+    -- IN SQL Server there are four options.
+    -- READ UNCOMMITTED -- Queries and statements can read data rows modified by other transactions
+        -- that are yet to be commited- Does not issue shared locks or honor exclusive locks
+        -- Can accidentally result in dirty (untrue) reads, and phantom reads on records that wont exist
+        -- once that other transaction finishes.
+    -- READ COMMITTED (Default) - Prevents dirty reads by requiring that data read by a statement must be
+        --  committed befores it is processed.
+    
+    -- REPEATABLE READ - Places shared locks on all datra read by transaction and HOLDS THEM until the intire transaction
+        -- No other transaction can modify or delete these rows during this time. Prevents some dirty reads,
+        -- BUT other transactions can insert new rows that may bleed into your filtring for queries    
+    -- SERIALIZABLE - Most restrictive. Places locks on rows that prevent other transactions from updating
+        -- deleting OR inserting in date within the read range until your transaction finishes. This
+        -- prevents ALL concurrency snomslird - and is also slow as hell. SQL Server has to create
+        -- manage and delete a lot of locks. You can also create deadlocks.
+    --
+
+    -- Fixing my error from before + constraint fix
+
+    -- Reset copies
+    UPDATE dbo.Book SET AvailableCopies = 0 WHERE BookId = 6;
+
+    -- Add constraint
+    ALTER TABLE dbo.Book
+    ADD CONSTRAINT CK_Book_Min_AvailableCopies
+    CHECK(AvailableCopies >= 0);
+
+-- VIEWS, INDEXES, STORED PROCEDURES and more.
+-- Views are like saved queries.
+-- We can query the view as if it was a table
+
+GO
+CREATE OR ALTER VIEW dbo.vw_ActiveLoans
+AS 
+    SELECT m.FirstName + ' ' + m.LastName Member,
+        b.Title,
+        c.Name as Category, 
+        l.DueDate,
+        DATEDIFF(DAY, l.DueDate, GETDATE()) AS DaysOverdue
+    FROM dbo.Loan l 
+    JOIN dbo.Member m ON m.MemberId = l.MemberId
+    JOIN dbo.Book b ON b.BookId = l.BookId
+    JOIN dbo.Category c ON c.CategoryId = b.CategoryId
+    WHERE l.ReturnDate IS NULL;
+
+GO
+
+-- This is not a saved precompiled  datast- There is something called an indexed view
+-- that is outside of our scope that is precompiled. But a VIEW like the one above, a regular VIEW
+-- is just a saved select- The data updates to be current whenever you call upon it.
+
+SELECT * FROM dbo.vw_ActiveLoans ORDER BY DueDate;
+
+-- Increasing in complexity and potential usefulness
+-- We have store procedures - a named program in the database. Parameters/arguments, logic
+-- transaction wrapping and limited/optional returns
+GO
+CREATE OR ALTER PROCEDURE dbo.usp_CheckoutBook
+    -- This first section between CREATE and AS holds your arguments/inputs
+    @BookId INT,
+    @MemberId INT,
+    @Days INT = 14 -- how long is the loan for
+AS
+BEGIN
+    SET XACT_ABORT ON;
+    SET NOCOUNT ON; --turns off the "x rows affected message print"
+    BEGIN TRY
+        BEGIN TRANSACTION
+            -- We want to check if there are copies available to be checked out
+            IF (SELECT AvailableCopies FROM dbo.Book WHERE BookId = @BookId) <= 0
+                -- Manually throwing an error in SQL server
+                -- THROW takes 3 arguments
+                    -- error_number - some integer representing the exception , must be 50000 or higher
+                    -- message - some string describirn the error
+                    -- state - an int between 0 and 255 describing where the error originated
+                THROW 50000, 'No copies available ti check out.' ,1;
+            INSERT INTO dbo.Loan (BookId, MemberId, DueDate)
+            VALUES (@BookId, @MemberId, DATEADD(DAY,@Days, GETDATE()));
+            
+            UPDATE dbo.Book SET AvailableCopies = AvailableCopies - 1 WHERE BookId = @BookId;
+
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        THROW; -- Bubbling up the Try block error to wherever my stored procedures was called
+    END CATCH
+END;
+
+GO
+EXEC dbo.usp_CheckoutBook @BookId = 1, @MemberId = 3, @Days =21;
+
+SELECT * FROM dbo.Loan WHERE BookId = 1 AND MemberId = 3;
+-- Stored Procedure vs Uset Defined Function
+-- A stored procedures DOES something. Writesc, transactions, returning result sets, etc. Called with EXEC
+-- A function (user defined or otherwise) computes a value- Its called INSIDE a query, and it itself
+-- does not change the data in the database.
+
+GO
+--User defined function
+CREATE OR ALTER FUNCTION dbo.fn_DaysOverdue (@dueDate DATE)
+RETURNS INT 
+AS 
+BEGIN
+    -- Decalaring a variable in SQL that is scoped to this function
+    DECLARE @days INT = DATEDIFF(DAY, @dueDate, CAST(GETDATE() AS DATE));
+    -- IF days  is greater than 0 (the book is overdue) - return that value
+    -- IF days is 0 (or less somehow) return 0 instead
+    RETURN CASE WHEN @days > 0 THEN @days ELSE 0 END;
+END;
+
+
+GO
+SELECT Title, DueDate, dbo.fn_DaysOVerdue(DueDate) AS DaysOverdue
+FROM dbo.Loan l
+JOIN dbo.Book b ON b.BookId = l.BookId
+WHERE ReturnDate is NULL;
+
+-- Indexes - a lookup structures like an index in a book
+-- You create it on certain columns in a table to allow lookup on that column
+-- without the DB engine having to scan row by row.
+
+-- Trading READ Speed for WRITE speed
+CREATE INDEX IX_Loan_MemberId ON dbo.Loan (MemberId);
