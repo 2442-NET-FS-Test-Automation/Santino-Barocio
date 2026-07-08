@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="KitchenFulfillment.Api/KitchenFulfillment.Api.csproj" />
+  <Project Path="KitchenFulfillment.Data/KitchenFulfillment.Data.csproj" />
+</Solution>
